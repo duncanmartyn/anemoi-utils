@@ -60,5 +60,13 @@ def test_registry() -> None:
         reg.lookup("fa")
 
 
+def test_registry_with_lazy_import_alias_first():
+    from .dummy_registry import registry
+
+    # regression test: previously if alias lookup was the first access from a lazily imported factory,
+    # the registry would raise
+    assert registry.lookup("test-alias")() == "success"
+
+
 if __name__ == "__main__":
     test_registry()
