@@ -23,55 +23,15 @@ from functools import cache
 import requests
 
 from .caching import cached
-from .config import load_config
+from .settings import AnemoiSettings
 
 LOG = logging.getLogger(__name__)
 
-
-class LazyConfig:
-
-    def _get_from_env(self, key: str) -> str | None:
-        """Get a configuration value from the environment variable.
-
-        Parameters
-        ----------
-        key : str
-            The configuration key to look up.
-
-        Returns
-        -------
-        str or None
-            The value of the environment variable if it exists, otherwise None.
-        """
-        env_key = f"ANEMOI_CONFIG_PARAMDB_{key.upper()}"
-        return os.getenv(env_key)
-
-    @property
-    def _config(self) -> dict:
-        return load_config().get("paramdb", {})  # type: ignore
-
-    @property
-    def default_origin(self) -> str:
-        """Default origin to use when disambiguating parameters with the same shortname."""
-        return self._get_from_env("default_origin") or self._config.get("default_origin", "ecmwf")
-
-    @property
-    def cache_length(self) -> int:
-        """Cache length in seconds for GRIB parameter lookups."""
-        return (
-            int(self._get_from_env("cache_length") or self._config.get("cache_length", 30)) * 24 * 3600
-        )  # Default to 30 days
-
-    @property
-    def local_cache(self) -> str | None:
-        """Path to a local cache file for GRIB parameters. If set, this will be used instead of making API calls."""
-        return self._get_from_env("local_cache") or self._config.get("local_cache", None)
+SETTINGS = AnemoiSettings()
+"""Anemoi settings, loaded on module import."""
 
 
-GRIB_CONFIG = LazyConfig()
-
-
-@cached(collection="grib", expires=GRIB_CONFIG.cache_length)
+@cached(collection="grib", expires=SETTINGS.paramdb.cache_length * 24 * 3600)
 def _units() -> dict[str, str]:
     """Fetch and cache GRIB parameter units.
 
@@ -133,7 +93,7 @@ def _local_search_param(name: str) -> list[dict[str, str | int | list[str]]]:
     KeyError
         If no parameter is found.
     """
-    local_cache = GRIB_CONFIG.local_cache
+    local_cache = SETTINGS.paramdb.local_cache
     assert local_cache is not None, "Local cache is not configured."
 
     local_param_db = _get_local_db(local_cache)
@@ -145,7 +105,7 @@ def _local_search_param(name: str) -> list[dict[str, str | int | list[str]]]:
     raise KeyError(f"{name} not found in local cache.")
 
 
-@cached(collection="grib", expires=GRIB_CONFIG.cache_length)
+@cached(collection="grib", expires=SETTINGS.paramdb.cache_length * 24 * 3600)
 def _online_search_param(name: str, **filters) -> list[dict[str, str | int | list[str]]]:
     """Search for a GRIB parameter by name using the online API.
 
@@ -193,7 +153,7 @@ def _search_param(name: str, **filters) -> dict[str, str | int | list[str]]:
 
     name = re.escape(name)
 
-    if GRIB_CONFIG.local_cache is not None:
+    if SETTINGS.paramdb.local_cache is not None:
         if filters:
             warnings.warn("Filters are ignored when using local cache.")
         results = _local_search_param(name)
@@ -205,15 +165,15 @@ def _search_param(name: str, **filters) -> dict[str, str | int | list[str]]:
 
     if len(results) > 1:
         names = [f"{r.get('id')} ({r.get('name')})" for r in results]
-        dissemination = [r for r in results if "dissemination" in r.get("access_ids", [])]
+        dissemination = [r for r in results if "dissemination" in r.get("access_ids", [])]  # type: ignore[reportOperatorIssue]
         if len(dissemination) == 1:
             return dissemination[0]
 
         warnings.warn(f"{name} is ambiguous: {', '.join(names)}.")
-        if "origin" not in filters and GRIB_CONFIG.local_cache is None:
-            warnings.warn(f"Applying origin='{GRIB_CONFIG.default_origin}' in an attempt to disambiguate {name}.")
+        if "origin" not in filters and SETTINGS.paramdb.local_cache is None:
+            warnings.warn(f"Applying origin='{SETTINGS.paramdb.default_origin}' in an attempt to disambiguate {name}.")
             try:
-                filtered_param = _search_param(name, **{**filters, "origin": GRIB_CONFIG.default_origin})
+                filtered_param = _search_param(name, **{**filters, "origin": SETTINGS.paramdb.default_origin})
                 warnings.warn(
                     f"Disambiguated {name} to id: {filtered_param['id']} ({filtered_param.get('name', 'unknown')})."
                 )
@@ -227,7 +187,7 @@ def _search_param(name: str, **filters) -> dict[str, str | int | list[str]]:
     return results[0]
 
 
-@cached(collection="grib", expires=GRIB_CONFIG.cache_length)
+@cached(collection="grib", expires=SETTINGS.paramdb.cache_length * 24 * 3600)
 def origin(name: str) -> dict[str, str | int]:
     """Search for an id of an origin by name.
 
@@ -276,7 +236,7 @@ def shortname_to_paramid(shortname: str, **filters) -> int:
     >>> shortname_to_paramid("2t")
     167
     """
-    return _search_param(shortname, **filters)["id"]
+    return _search_param(shortname, **filters)["id"]  # type: ignore[reportReturnType]
 
 
 def paramid_to_shortname(paramid: int, **filters) -> str:
@@ -297,7 +257,7 @@ def paramid_to_shortname(paramid: int, **filters) -> str:
     >>> paramid_to_shortname(167)
     '2t'
     """
-    return _search_param(str(paramid), **filters)["shortname"]
+    return _search_param(str(paramid), **filters)["shortname"]  # type: ignore[reportReturnType]
 
 
 def units(param: int | str) -> str:
