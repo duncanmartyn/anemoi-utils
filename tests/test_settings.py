@@ -423,6 +423,7 @@ class TestBucketOverrides:
 class TestObjectStorageConfig:
     """Tests for the ObjectStorageConfig class."""
 
+    @pytest.mark.skipif(os.name != "posix", reason="POSIX permissions only")
     def test_object_storage_raises_on_mixed_backends(self, isolated_settings) -> None:
         """A bucket config that mixes S3 and Azure fields should raise."""
         isolated_settings.secrets_toml.write_text(
