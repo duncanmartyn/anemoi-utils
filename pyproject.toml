@@ -82,10 +82,8 @@ version_file = "src/anemoi/utils/_version.py"
 
 [tool.ruff]
 line-length = 120
-extend-exclude = ["docs/**/*_.py"]
-
-[tool.ruff.lint.isort]
-force-single-line = true
+extend-exclude = [ "docs/**/*_.py" ]
+lint.isort.force-single-line = true
 
 [tool.mypy]
 mypy_path = "src"
