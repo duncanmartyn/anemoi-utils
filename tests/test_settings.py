@@ -434,6 +434,7 @@ class TestObjectStorageConfig:
                 """,
             ),
         )
+        isolated_settings.secrets_toml.chmod(0o600)
         with pytest.raises(ValueError, match="Mixed S3 and Azure"):
             isolated_settings.load()
 
