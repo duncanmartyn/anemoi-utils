@@ -327,7 +327,7 @@ class AnemoiSettings(BaseSettings):
     ## ---------- Setting fields ---------- ##
 
     object_storage: ObjectStorageConfig = Field(default_factory=ObjectStorageConfig, alias="object-storage")
-    """Configuration for S3-compatible object storage."""
+    """Configuration for cloud (S3-compatible and Azure Blob) object storage."""
 
     datasets: DatasetsConfig = Field(default_factory=DatasetsConfig)
     """Dataset discovery and validation settings."""

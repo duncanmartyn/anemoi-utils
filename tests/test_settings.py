@@ -420,6 +420,53 @@ class TestBucketOverrides:
         assert s.object_storage.endpoint_url == "https://global.example.com"
 
 
+class TestObjectStorageConfig:
+    """Tests for the ObjectStorageConfig class."""
+
+    @pytest.mark.skipif(os.name != "posix", reason="POSIX permissions only")
+    def test_object_storage_raises_on_mixed_backends(self, isolated_settings) -> None:
+        """A bucket config that mixes S3 and Azure fields should raise."""
+        isolated_settings.secrets_toml.write_text(
+            textwrap.dedent(
+                """\
+                [object-storage]
+                access_key_id = "AKIAEXAMPLE"
+                account_name = "azureaccount"
+                """,
+            ),
+        )
+        isolated_settings.secrets_toml.chmod(0o600)
+        with pytest.raises(ValueError, match="Mixed S3 and Azure"):
+            isolated_settings.load()
+
+    def test_object_storage_warns_on_type_field(self, isolated_settings) -> None:
+        """Setting the 'type' field in the config should warn."""
+        isolated_settings.toml.write_text(
+            textwrap.dedent(
+                """\
+                [object-storage]
+                type = "s3"
+                """,
+            ),
+        )
+        with pytest.warns(DeprecationWarning, match="is deprecated"):
+            isolated_settings.load()
+
+    def test_object_storage_warns_on_get_method(self, isolated_settings) -> None:
+        """Accessing the 'get' method should warn."""
+        isolated_settings.toml.write_text(
+            textwrap.dedent(
+                """\
+                [object-storage]
+                endpoint_url = "https://global.example.com"
+                """,
+            ),
+        )
+        s = isolated_settings.load()
+        with pytest.warns(DeprecationWarning, match="is deprecated"):
+            s.object_storage.get("endpoint_url")
+
+
 # ---------------------------------------------------------------------------
 # Secret tree detection and splitting
 # ---------------------------------------------------------------------------
